@@ -21,7 +21,10 @@ from app.core.security import get_current_user
 from app.schemas.auth import CurrentUser
 from app.services import history_service, report_pdf_service
 
-router = APIRouter(prefix="/api", tags=["Reports"])
+# No "/api" prefix here -- see app/api/analysis.py's comment: main.py's
+# api_router mount already adds "/api", so keeping it here doubled the
+# path to /api/api/reports/{analysis_id}.
+router = APIRouter(prefix="", tags=["Reports"])
 
 
 @router.get(

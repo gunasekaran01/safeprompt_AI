@@ -15,8 +15,12 @@ from supabase import Client
 
 from app.api.deps import is_admin_email
 from app.db import admin_crud
-from app.schemas.admin import AdminOverviewResponse, AdminUserSummary, AdminUsersResponse
-from app.schemas.stats import RiskLevelCount
+from app.schemas.admin import (
+    AdminOverviewResponse,
+    AdminUserSummary,
+    AdminUsersResponse,
+    RiskLevelCount,
+)
 
 RISK_LEVEL_ORDER = ("safe", "low", "medium", "high", "critical")
 

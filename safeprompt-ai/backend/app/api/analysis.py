@@ -28,7 +28,13 @@ from app.services.scoring_service import (
 )
 from app.services.toxicity_service import analyze_toxicity
 
-router = APIRouter(prefix="/api", tags=["Analysis"])
+# No "/api" prefix here: app/api/router.py's api_router mounts this router
+# directly, and main.py mounts api_router itself with prefix="/api" -- an
+# extra "/api" here previously caused this to register at /api/api/analyze
+# instead of /api/analyze, which the frontend (posting to /api/analyze)
+# could never reach -- a plain 404, surfaced to users as axios's generic
+# "Unable to reach the server" network-error message.
+router = APIRouter(prefix="", tags=["Analysis"])
 
 
 @router.post(

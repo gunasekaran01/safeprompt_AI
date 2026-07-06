@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # uses its own anon key via VITE_SUPABASE_ANON_KEY instead).
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
+    SUPABASE_ANON_KEY: str = ""
 
     # When True (the default), app data (analyses/reports/profiles) is
     # stored in an in-memory local store inside this process instead of
@@ -48,6 +49,28 @@ class Settings(BaseSettings):
     RISK_THRESHOLD_MEDIUM: int = 50
     RISK_THRESHOLD_HIGH: int = 25
     # Anything below RISK_THRESHOLD_HIGH is classified as "Critical"
+
+    # ML detector toggles and model names
+    ENABLE_ML_DETECTORS: bool = True
+    EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
+    TOXICITY_MODEL_NAME: str = "original"
+
+    # Toxicity detection thresholds
+    TOXICITY_CATEGORY_THRESHOLD: float = 0.5
+
+    # Injection similarity threshold for semantic matching (0-1)
+    INJECTION_SIMILARITY_THRESHOLD: float = 0.75
+
+    # Scoring engine weights and floor settings
+    SCORE_INJECTION_PENALTY_WEIGHT: float = 0.6
+    SCORE_INJECTION_CONFIDENCE_WEIGHT: float = 0.4
+    SCORE_TOXICITY_PENALTY_WEIGHT: float = 0.6
+    SCORE_TOXICITY_SEVERITY_WEIGHT: float = 0.4
+
+    SCORE_HIGH_CONFIDENCE_FLOOR_THRESHOLD: float = 0.9
+    SCORE_HIGH_CONFIDENCE_SCORE_CAP: float = 15.0
+    # Directory to write generated reports to (override in tests)
+    REPORTS_DIR: str = "reports"
 
     # Email(s) of accounts that get admin-dashboard access (GET/DELETE
     # /api/admin/...), checked case-insensitively against the logged-in
@@ -82,7 +105,10 @@ class Settings(BaseSettings):
     @property
     def is_supabase_configured(self) -> bool:
         """Whether both Supabase settings needed to create a client are present."""
-        return bool(self.SUPABASE_URL and self.SUPABASE_KEY)
+        # Accept either a service-role key or an anon/public key for
+        # authentication checks; tests set SUPABASE_ANON_KEY rather than
+        # a service-role key so permit either to indicate configuration.
+        return bool(self.SUPABASE_URL and (self.SUPABASE_KEY or self.SUPABASE_ANON_KEY))
 
 
 @lru_cache

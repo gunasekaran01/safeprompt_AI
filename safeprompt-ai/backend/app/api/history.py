@@ -15,7 +15,10 @@ from app.schemas.auth import CurrentUser
 from app.schemas.history import AnalysisListResponse, AnalysisRecord, DashboardStatsResponse
 from app.services import history_service
 
-router = APIRouter(prefix="/api", tags=["History"])
+# No "/api" prefix here -- see app/api/analysis.py's comment: main.py's
+# api_router mount already adds "/api", so keeping it here doubled every
+# path to /api/api/history, /api/api/dashboard/stats, etc.
+router = APIRouter(prefix="", tags=["History"])
 
 VALID_RISK_LEVELS = {"safe", "low", "medium", "high", "critical"}
 

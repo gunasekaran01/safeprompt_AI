@@ -43,36 +43,13 @@ def _unauthorized(detail: str) -> HTTPException:
     )
 
 
-async def get_current_user(
-    authorization: str | None = Header(default=None),
-) -> CurrentUser:
-    """
-    FastAPI dependency that requires a valid `Authorization: Bearer <jwt>`
-    header, validates it against Supabase Auth, and returns the
-    authenticated user. Raises 401 for a missing header, a malformed
-    header, or a token Supabase rejects (invalid, expired, or revoked).
-    """
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise _unauthorized("Missing or malformed Authorization header. Expected: Bearer <token>.")
+# Delegate authentication to the shared, tested implementation in app.core.security
+# so test patches against app.core.security.get_supabase_client or that module
+# take effect for both modules.
+from app.core.security import get_current_user as _core_get_current_user
 
-    token = authorization.split(" ", 1)[1].strip()
-    if not token:
-        raise _unauthorized("Missing bearer token.")
-
-    client = get_supabase_client()
-    try:
-        response = client.auth.get_user(token)
-    except Exception as exc:
-        # supabase-py raises AuthApiError (and similar) for invalid/expired/
-        # revoked tokens, and can also raise on transient network issues --
-        # either way, the request cannot be authenticated, so treat it as 401.
-        raise _unauthorized("Invalid or expired session. Please log in again.") from exc
-
-    user = getattr(response, "user", None)
-    if user is None:
-        raise _unauthorized("Invalid or expired session. Please log in again.")
-
-    return CurrentUser(id=user.id, email=user.email, access_token=token)
+# Keep the same exported name so routes can depend on it as before.
+get_current_user = _core_get_current_user
 
 
 async def get_current_user_client(current_user: CurrentUser = Depends(get_current_user)) -> Client:

@@ -75,14 +75,16 @@ class _FakeAuthClient:
 @pytest.fixture(autouse=True)
 def fake_auth(monkeypatch):
     """
-    Patches the Supabase client app.api.deps.get_current_user validates
-    tokens against, so a request bearing AUTH_HEADERS is treated as an
-    authenticated request from TEST_USER_ID, without needing a real
-    Supabase Auth server. Autouse + conftest-level so every test file's
-    TestClient can just send AUTH_HEADERS and get a valid session for
-    free. test_auth.py, which specifically exercises authentication
-    *failure* modes, layers its own more detailed fake auth client on
-    top of this — its module-level autouse fixture runs after this
-    conftest-level one, so its tokens/behaviors still take effect there.
+    Patches the Supabase client app.core.security.get_current_user validates
+    tokens against (that's where the auth resolution actually lives, even
+    though app.api.deps.get_current_user is the name routes depend on), so
+    a request bearing AUTH_HEADERS is treated as an authenticated request
+    from TEST_USER_ID, without needing a real Supabase Auth server. Autouse
+    + conftest-level so every test file's TestClient can just send
+    AUTH_HEADERS and get a valid session for free. test_auth.py, which
+    specifically exercises authentication *failure* modes, layers its own
+    more detailed fake auth client on top of this — its module-level
+    autouse fixture runs after this conftest-level one, so its
+    tokens/behaviors still take effect there.
     """
-    monkeypatch.setattr("app.api.deps.get_supabase_client", lambda: _FakeAuthClient())
+    monkeypatch.setattr("app.core.security.get_supabase_client", lambda: _FakeAuthClient())

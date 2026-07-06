@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import CurrentUser, get_current_user
 from app.db import crud
-from app.schemas.analysis import AnalyzeRequest, AnalyzeResponse
+from app.schemas.analysis import PromptAnalysisRequest, AnalyzeResponse
 from app.services.analysis_service import analyze_prompt
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/analyze", tags=["Analysis"])
 
 @router.post("", response_model=AnalyzeResponse, summary="Analyze a prompt for safety")
 def analyze(
-    request: AnalyzeRequest,
+    request: PromptAnalysisRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> AnalyzeResponse:
     """

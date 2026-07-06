@@ -17,6 +17,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.base import CamelCaseModel
+from typing import Dict, List, Optional
+from uuid import uuid4
+from datetime import timezone
 
 
 class PromptAnalysisRequest(BaseModel):
@@ -67,3 +70,26 @@ class PromptAnalysisResponse(CamelCaseModel):
     recommendation: str
     reasoning: str
     analyzed_at: datetime
+
+
+# Backwards-compatible model used by tests and the CRUD layer
+class AnalyzeResponse(BaseModel):
+    """Compatibility model matching older test/DB expectations.
+
+    Fields: id, prompt, timestamp, score, risk_level, injection_detected,
+    toxicity_detected, injection_confidence, toxicity_scores, recommendation,
+    reasoning
+    """
+
+    id: str = Field(default_factory=lambda: uuid4().hex)
+    prompt: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    score: float
+    risk_level: str
+    injection_detected: bool
+    toxicity_detected: bool
+    injection_confidence: float = 0.0
+    toxicity_scores: Dict = Field(default_factory=dict)
+    recommendation: str
+    reasoning: List[str] = Field(default_factory=list)
+

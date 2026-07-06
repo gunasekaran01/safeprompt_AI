@@ -5,7 +5,12 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from app.schemas.stats import RiskLevelCount
+
+class RiskLevelCount(BaseModel):
+    """Count of analyses at a given risk level, for the admin overview's distribution chart."""
+
+    risk_level: str
+    count: int
 
 
 class AdminOverviewResponse(BaseModel):

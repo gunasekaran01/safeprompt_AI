@@ -28,11 +28,11 @@ from app.services import account_service
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
 
-@router.get("/me", response_model=ProfileResponse)
+@router.get("/me")
 async def read_my_profile(
     current_user: CurrentUser = Depends(get_current_user),
     client: Client = Depends(get_current_user_client),
-) -> ProfileResponse:
+):
     """Returns the authenticated user's profile, creating it on first access."""
     profile = profile_crud.get_or_create_profile(
         client,
@@ -40,15 +40,15 @@ async def read_my_profile(
         email=current_user.email or "",
         name=None,
     )
-    return ProfileResponse(**profile)
+    return profile
 
 
-@router.patch("/me", response_model=ProfileResponse)
+@router.patch("/me")
 async def update_my_profile(
     updates: ProfileUpdateRequest,
     current_user: CurrentUser = Depends(get_current_user),
     client: Client = Depends(get_current_user_client),
-) -> ProfileResponse:
+):
     """
     Updates the authenticated user's name and/or avatar_url. Ensures the
     profile row exists first (get_or_create_profile) so a user editing
@@ -68,7 +68,7 @@ async def update_my_profile(
     updated = profile_crud.update_profile(client, current_user.id, fields_to_update)
     if updated is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
-    return ProfileResponse(**updated)
+    return updated
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

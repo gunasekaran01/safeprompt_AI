@@ -18,7 +18,18 @@ import logging
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.db.supabase_client import get_supabase_client
+from app.db.supabase_client import get_supabase_client as _db_get_supabase_client
+
+# Resolve the auth client dynamically at call time so test monkeypatches
+# against this module work as expected.
+
+def get_supabase_client():
+    return _db_get_supabase_client()
+
+
+def _resolve_supabase_client():
+    return get_supabase_client()
+
 from app.schemas.auth import CurrentUser
 
 logger = logging.getLogger(__name__)
@@ -46,7 +57,7 @@ def get_current_user(
     token = credentials.credentials
 
     try:
-        client = get_supabase_client()
+        client = _resolve_supabase_client()
         response = client.auth.get_user(token)
     except RuntimeError as exc:
         # Supabase isn't configured at all — a server misconfiguration,
@@ -60,4 +71,12 @@ def get_current_user(
     if user is None or not getattr(user, "id", None):
         raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
 
-    return CurrentUser(id=user.id, email=getattr(user, "email", None))
+    # Return an object compatible with app.api.deps.CurrentUser (id, email, access_token).
+    try:
+        from app.api.deps import CurrentUser as ApiCurrentUser
+
+        return ApiCurrentUser(id=user.id, email=getattr(user, "email", None), access_token=token)
+    except Exception:
+        # Fallback to the lightweight schema CurrentUser for callers that
+        # only expect id/email (some parts of the app use this type).
+        return CurrentUser(id=user.id, email=getattr(user, "email", None))

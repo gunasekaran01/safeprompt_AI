@@ -50,3 +50,7 @@ class HistoryQueryParams(CamelCaseModel):
     risk_level: Optional[str] = None
     limit: int = 20
     offset: int = 0
+
+
+# Legacy alias kept for compatibility with older route modules.
+HistoryResponse = AnalysisListResponse

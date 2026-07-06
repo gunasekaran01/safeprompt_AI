@@ -63,10 +63,11 @@ def get_supabase_client():
     settings = get_settings()
     if not settings.is_supabase_configured:
         raise RuntimeError(
-            "SUPABASE_URL and SUPABASE_KEY must be set (see backend/.env.example) "
+            "SUPABASE_URL and SUPABASE_KEY or SUPABASE_ANON_KEY must be set (see backend/.env.example) "
             "before the database or authentication can be used."
         )
-    real_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    api_key = settings.SUPABASE_KEY or settings.SUPABASE_ANON_KEY
+    real_client = create_client(settings.SUPABASE_URL, api_key)
     if settings.USE_LOCAL_DATA_STORE:
         return _LocalDataHybridClient(real_client, _get_local_data_store())
     return real_client
