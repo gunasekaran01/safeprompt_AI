@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../services/supabaseClient.js'
+import apiClient from '../services/apiClient.js'
+import { getMyProfile } from '../services/profileService.js'
 
 const AuthContext = createContext(undefined)
 
@@ -13,10 +15,31 @@ const AuthContext = createContext(undefined)
  * - Exposes signUp / signIn / signOut / resetPassword / updatePassword,
  *   each throwing on failure so calling components can catch and display
  *   the error message.
+ * - Once a session exists, also fetches GET /api/auth/me (for `isAdmin`
+ *   — computed server-side, never trust a client-side email comparison
+ *   for this) and GET /api/profiles/me (for `profile`, i.e. display
+ *   name/avatar — used by Navbar's user menu). Both are exposed here,
+ *   in one place, rather than each component fetching its own copy.
+ *   `refreshProfile()` lets ProfileForm.jsx re-fetch after a save so the
+ *   Navbar reflects an edited name/avatar immediately.
  */
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [profile, setProfile] = useState(null)
+
+  const refreshProfile = useCallback(async () => {
+    try {
+      const nextProfile = await getMyProfile()
+      setProfile(nextProfile)
+      return nextProfile
+    } catch {
+      // Non-fatal: the Navbar/AdminPage just fall back to email-only
+      // display if this fails. The auth session itself is unaffected.
+      return null
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -42,6 +65,31 @@ export function AuthProvider({ children }) {
       subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    if (!session?.user) {
+      setIsAdmin(false)
+      setProfile(null)
+      return
+    }
+
+    let isCancelled = false
+
+    apiClient
+      .get('/auth/me')
+      .then((response) => {
+        if (!isCancelled) setIsAdmin(Boolean(response.data?.is_admin))
+      })
+      .catch(() => {
+        if (!isCancelled) setIsAdmin(false)
+      })
+
+    refreshProfile()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [session?.user, refreshProfile])
 
   const signUp = useCallback(async (email, password, name) => {
     const { data, error } = await supabase.auth.signUp({
@@ -84,13 +132,27 @@ export function AuthProvider({ children }) {
       user: session?.user ?? null,
       isAuthenticated: Boolean(session?.user),
       isLoading,
+      isAdmin,
+      profile,
+      refreshProfile,
       signUp,
       signIn,
       signOut,
       resetPassword,
       updatePassword,
     }),
-    [session, isLoading, signUp, signIn, signOut, resetPassword, updatePassword],
+    [
+      session,
+      isLoading,
+      isAdmin,
+      profile,
+      refreshProfile,
+      signUp,
+      signIn,
+      signOut,
+      resetPassword,
+      updatePassword,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

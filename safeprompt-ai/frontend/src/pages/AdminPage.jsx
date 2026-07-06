@@ -15,11 +15,11 @@ import {
 import StatCard from '../components/Dashboard/StatCard.jsx'
 import { formatCount, formatScore } from '../utils/formatters.js'
 import { getAdminOverview, getAdminUsers, deleteAdminUser } from '../services/adminService.js'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useAuth } from '../utils/AuthContext.jsx'
 
 /**
- * Admin dashboard — platform-wide visibility for the SafePrompt AI admin
- * account (see utils/constants.js:ADMIN_EMAIL). Reachable only via
+ * Admin dashboard — platform-wide visibility for whichever accounts are
+ * listed in Settings.ADMIN_EMAILS (backend/.env). Reachable only via
  * <AdminRoute> (components/Auth/AdminRoute.jsx), and every request is
  * independently re-authorized server-side regardless of how this page
  * was reached (app.api.deps.require_admin).

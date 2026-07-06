@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 
 from supabase import Client
 
+from app.api.deps import is_admin_email
 from app.db import admin_crud
 from app.schemas.admin import AdminOverviewResponse, AdminUserSummary, AdminUsersResponse
 from app.schemas.stats import RiskLevelCount
@@ -39,7 +40,11 @@ def compute_admin_overview(client: Client) -> AdminOverviewResponse:
     safe = sum(1 for row in analyses if row.get("risk_level") in ("safe", "low"))
     injection = sum(1 for row in analyses if row.get("injection_detected"))
     toxic = sum(1 for row in analyses if row.get("toxicity_detected"))
-    average_score = round(sum(row.get("score", 0) for row in analyses) / total_analyses, 1) if total_analyses else 0.0
+    average_score = (
+        round(sum(row.get("safety_score", 0) for row in analyses) / total_analyses, 1)
+        if total_analyses
+        else 0.0
+    )
 
     return AdminOverviewResponse(
         total_users=len(profiles),
@@ -73,7 +78,7 @@ def list_users_with_counts(client: Client) -> AdminUsersResponse:
             id=profile["id"],
             email=profile["email"],
             name=profile.get("name"),
-            is_admin=bool(profile.get("is_admin", False)),
+            is_admin=is_admin_email(profile.get("email")),
             created_at=profile["created_at"],
             analyses_count=counts_by_user.get(profile["id"], 0),
         )

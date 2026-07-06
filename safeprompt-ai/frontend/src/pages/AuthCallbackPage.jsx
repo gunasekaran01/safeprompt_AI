@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiLoader } from 'react-icons/fi'
-import { useAuth } from '../context/AuthContext.jsx'
+import { useAuth } from '../utils/AuthContext.jsx'
 
 /**
  * Landing page for Supabase's email verification links (signUp's

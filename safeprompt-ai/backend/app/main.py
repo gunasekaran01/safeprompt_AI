@@ -13,11 +13,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analysis import router as analysis_router
-from app.api.auth import router as auth_router
 from app.api.charts import router as charts_router
 from app.api.history import router as history_router
-from app.api.profile import router as profile_router
 from app.api.reports import router as reports_router
+from app.api.routes.admin import router as admin_router
+from app.api.routes.auth import router as auth_router
+from app.api.routes.profiles import router as profiles_router
 from app.core.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -56,11 +57,16 @@ app.add_middleware(
 )
 
 app.include_router(analysis_router)
-app.include_router(auth_router)
-app.include_router(profile_router)
 app.include_router(history_router)
 app.include_router(charts_router)
 app.include_router(reports_router)
+
+# These three come from app/api/routes/ (not app/api/*.py directly) and
+# use relative prefixes ("/auth", "/profiles", "/admin"), so the "/api"
+# prefix is added here at mount time rather than inside each router.
+app.include_router(auth_router, prefix="/api")
+app.include_router(profiles_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 
 @app.get("/api/health", tags=["System"])

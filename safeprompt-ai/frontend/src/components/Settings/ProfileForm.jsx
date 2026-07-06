@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { FiAlertTriangle, FiCheck, FiLoader, FiSave, FiUser } from 'react-icons/fi'
 import { getMyProfile, updateMyProfile } from '../../services/profileService.js'
+import { useAuth } from '../../utils/AuthContext.jsx'
 
 function ProfileForm() {
+  const { refreshProfile } = useAuth()
   const [name, setName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [email, setEmail] = useState('')
@@ -44,6 +46,7 @@ function ProfileForm() {
       setName(updated.name || '')
       setAvatarUrl(updated.avatarUrl || '')
       setIsSaved(true)
+      await refreshProfile()
       window.setTimeout(() => setIsSaved(false), 2500)
     } catch (err) {
       setError(err.message || 'Failed to save your profile.')

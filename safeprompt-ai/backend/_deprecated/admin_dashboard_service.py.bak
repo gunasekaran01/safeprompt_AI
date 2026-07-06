@@ -1,0 +1,115 @@
+"""
+Admin dashboard aggregation.
+
+New module, built directly on app/services/history_service.py's data
+path (get_supabase_client() + the `analyses`/`profiles`/`reports`
+tables) rather than the broken app/db/admin_crud.py (which requires a
+per-user-scoped Supabase client function, get_user_scoped_client, that
+doesn't exist anywhere in app/db/supabase_client.py).
+
+Platform-wide visibility here comes from the fact that
+get_supabase_client() already returns a client with access to every
+row (real service-role key, or the in-memory LocalDataStore shared by
+the whole process — see supabase_client.py) — no RLS admin policy is
+needed for this to see everyone's data, only the route-level
+`require_admin` check (see app/api/admin.py) gating who's allowed to
+call it.
+"""
+
+from collections import defaultdict
+from typing import Any, Dict, List
+
+from app.db.supabase_client import get_supabase_client
+from app.schemas.admin import AdminOverviewResponse, AdminUserSummary, AdminUsersResponse
+from app.schemas.stats import RiskLevelCount
+
+ANALYSES_TABLE = "analyses"
+PROFILES_TABLE = "profiles"
+REPORTS_TABLE = "reports"
+
+RISK_LEVEL_ORDER = ("safe", "low", "medium", "high", "critical")
+
+# Same bound used elsewhere (dashboard_charts_service.py) for the same
+# reason: fast and bounded without a Postgres RPC function.
+MAX_RECORDS = 5000
+
+
+def compute_admin_overview() -> AdminOverviewResponse:
+    """Aggregate platform-wide totals across every user for the admin dashboard's stat cards."""
+    client = get_supabase_client()
+
+    analyses: List[Dict[str, Any]] = (
+        client.table(ANALYSES_TABLE).select("*").limit(MAX_RECORDS).execute().data or []
+    )
+    profiles: List[Dict[str, Any]] = client.table(PROFILES_TABLE).select("*").execute().data or []
+    total_reports = client.table(REPORTS_TABLE).select("id", count="exact").execute().count or 0
+
+    total_analyses = len(analyses)
+
+    risk_counts: Dict[str, int] = defaultdict(int)
+    for row in analyses:
+        risk_counts[row.get("risk_level", "medium")] += 1
+    risk_distribution = [
+        RiskLevelCount(risk_level=level, count=risk_counts.get(level, 0))
+        for level in RISK_LEVEL_ORDER
+    ]
+
+    safe = sum(1 for row in analyses if row.get("risk_level") in ("safe", "low"))
+    injection = sum(1 for row in analyses if row.get("injection_detected"))
+    toxic = sum(1 for row in analyses if row.get("toxicity_detected"))
+    average_score = (
+        round(sum(row.get("safety_score", 0) for row in analyses) / total_analyses, 1)
+        if total_analyses
+        else 0.0
+    )
+
+    return AdminOverviewResponse(
+        total_users=len(profiles),
+        total_analyses=total_analyses,
+        total_reports=total_reports,
+        safe_prompts=safe,
+        unsafe_prompts=total_analyses - safe,
+        injection_attempts=injection,
+        toxic_prompts=toxic,
+        average_safety_score=average_score,
+        risk_level_distribution=risk_distribution,
+    )
+
+
+def list_users_with_counts(admin_email: str) -> AdminUsersResponse:
+    """
+    Returns every user's profile plus how many analyses they've run, for
+    the admin dashboard's user table. `admin_email` is compared
+    case-insensitively against each profile's email to flag which row is
+    the admin account.
+    """
+    client = get_supabase_client()
+
+    profiles: List[Dict[str, Any]] = (
+        client.table(PROFILES_TABLE).select("*").order("created_at", desc=True).execute().data or []
+    )
+    analyses: List[Dict[str, Any]] = (
+        client.table(ANALYSES_TABLE).select("user_id").limit(MAX_RECORDS).execute().data or []
+    )
+
+    counts_by_user: Dict[str, int] = defaultdict(int)
+    for row in analyses:
+        user_id = row.get("user_id")
+        if user_id:
+            counts_by_user[user_id] += 1
+
+    normalized_admin_email = admin_email.strip().lower()
+
+    users = [
+        AdminUserSummary(
+            id=profile["id"],
+            email=profile.get("email", ""),
+            name=profile.get("name"),
+            is_admin=(profile.get("email") or "").strip().lower() == normalized_admin_email,
+            created_at=profile["created_at"],
+            analyses_count=counts_by_user.get(profile["id"], 0),
+        )
+        for profile in profiles
+    ]
+
+    return AdminUsersResponse(users=users, total=len(users))

@@ -1,12 +1,14 @@
 import { Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout/Layout.jsx'
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx'
+import AdminRoute from './components/Auth/AdminRoute.jsx'
 import HomePage from './pages/HomePage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import AnalyzerPage from './pages/AnalyzerPage.jsx'
 import HistoryPage from './pages/HistoryPage.jsx'
 import AboutPage from './pages/AboutPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
+import AdminPage from './pages/AdminPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import RegisterPage from './pages/RegisterPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
@@ -16,8 +18,9 @@ import NotFoundPage from './pages/NotFoundPage.jsx'
 /**
  * Top-level route table. All routes render inside the shared <Layout />
  * (navbar + footer). Dashboard, Analyzer, History, and Settings require
- * an authenticated session via <ProtectedRoute />; Home, About, and the
- * auth pages are public. Unmatched paths fall through to the 404 page.
+ * an authenticated session via <ProtectedRoute />; /admin additionally
+ * requires isAdmin via <AdminRoute />; Home, About, and the auth pages
+ * are public. Unmatched paths fall through to the 404 page.
  */
 function App() {
   return (
@@ -37,6 +40,11 @@ function App() {
           <Route path="analyzer" element={<AnalyzerPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="settings" element={<SettingsPage />} />
+        </Route>
+
+        {/* Admin-only route */}
+        <Route element={<AdminRoute />}>
+          <Route path="admin" element={<AdminPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

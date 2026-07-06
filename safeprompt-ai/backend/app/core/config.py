@@ -49,12 +49,35 @@ class Settings(BaseSettings):
     RISK_THRESHOLD_HIGH: int = 25
     # Anything below RISK_THRESHOLD_HIGH is classified as "Critical"
 
+    # Email(s) of accounts that get admin-dashboard access (GET/DELETE
+    # /api/admin/...), checked case-insensitively against the logged-in
+    # user's email by app/api/deps.py's is_admin_email(). Comma-separated
+    # for more than one admin. ADMIN_EMAIL (singular) is kept for
+    # backward compatibility and merged into the same list.
+    ADMIN_EMAILS: str = ""
+    ADMIN_EMAIL: str = "gunavera2020@gmail.com"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
     )
+
+    @property
+    def admin_emails_list(self) -> List[str]:
+        """
+        Every configured admin email, lowercased and stripped, combining
+        ADMIN_EMAILS (comma-separated) and the legacy singular
+        ADMIN_EMAIL. This is what app/api/deps.py's is_admin_email()
+        actually checks against -- the single source of truth for admin
+        access, both for require_admin's 403 enforcement and for the
+        is_admin flag GET /api/auth/me returns to the frontend.
+        """
+        emails = [email.strip().lower() for email in self.ADMIN_EMAILS.split(",") if email.strip()]
+        if self.ADMIN_EMAIL.strip():
+            emails.append(self.ADMIN_EMAIL.strip().lower())
+        return list(dict.fromkeys(emails))  # de-duplicate, preserve order
 
     @property
     def is_supabase_configured(self) -> bool:

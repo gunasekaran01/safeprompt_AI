@@ -53,7 +53,7 @@ def list_all_analyses_raw(client: Client, limit: int = MAX_RECORDS_FOR_ADMIN_STA
     response = (
         client.table(ANALYSES_TABLE)
         .select("*")
-        .order("timestamp", desc=True)
+        .order("created_at", desc=True)
         .limit(limit)
         .execute()
     )

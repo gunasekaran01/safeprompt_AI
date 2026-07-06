@@ -70,3 +70,39 @@ def get_supabase_client():
     if settings.USE_LOCAL_DATA_STORE:
         return _LocalDataHybridClient(real_client, _get_local_data_store())
     return real_client
+
+
+def get_user_scoped_client(access_token: str):
+    """
+    Returns a client authenticated as one specific end user, for routes
+    that need per-user Row Level Security to be the actual enforcement
+    boundary (app/db/profile_crud.py, app/db/admin_crud.py -- see
+    app.api.deps.get_current_user_client, which wraps this).
+
+    Mode-aware, matching get_supabase_client() above:
+    - USE_LOCAL_DATA_STORE=True (the default): there is no real Postgres
+      RLS to attach a JWT to -- .table() calls are served by the single
+      shared in-memory LocalDataStore regardless of which client asks --
+      so this just returns the same cached get_supabase_client(). Every
+      caller (profile_crud.py, admin_crud.py) already filters explicitly
+      by user_id/id in Python, which is what actually enforces isolation
+      in this mode; admin routes deliberately skip that filter to see
+      everyone, which is safe because they're gated by
+      app.api.deps.require_admin at the route layer instead.
+    - USE_LOCAL_DATA_STORE=False (real Supabase Postgres): creates a
+      fresh, uncached client with the given user's own JWT attached via
+      `.postgrest.auth()`, so RLS policies using auth.uid() (see
+      backend/supabase/schema.sql) are the real, Postgres-enforced
+      boundary -- not just an application-level filter.
+    """
+    settings = get_settings()
+    if not settings.is_supabase_configured:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_KEY must be set (see backend/.env.example) "
+            "before a user-scoped client can be created."
+        )
+    if settings.USE_LOCAL_DATA_STORE:
+        return get_supabase_client()
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    client.postgrest.auth(access_token)
+    return client
