@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { FiAlertTriangle, FiRefreshCw } from 'react-icons/fi'
 import StatsGrid from '../components/Dashboard/StatsGrid.jsx'
 import RecentActivityTable from '../components/Dashboard/RecentActivityTable.jsx'
-import ChartsPlaceholder from '../components/Dashboard/ChartsPlaceholder.jsx'
-import { getDashboardStats, getRecentActivity } from '../services/dashboardService.js'
+import DashboardCharts from '../components/Dashboard/DashboardCharts.jsx'
+import { getDashboardStats, getRecentActivity, getDashboardCharts } from '../services/dashboardService.js'
 
 /**
  * Dashboard page. Loads aggregate stats and recent activity from
@@ -15,6 +15,7 @@ import { getDashboardStats, getRecentActivity } from '../services/dashboardServi
 function DashboardPage() {
   const [stats, setStats] = useState(null)
   const [activity, setActivity] = useState([])
+  const [charts, setCharts] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
@@ -28,12 +29,14 @@ function DashboardPage() {
     setError(null)
 
     try {
-      const [statsResponse, activityResponse] = await Promise.all([
+      const [statsResponse, activityResponse, chartsResponse] = await Promise.all([
         getDashboardStats(),
         getRecentActivity(8),
+        getDashboardCharts(14),
       ])
       setStats(statsResponse)
       setActivity(activityResponse)
+      setCharts(chartsResponse)
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
       setError('Something went wrong while loading the dashboard. Please try again.')
@@ -89,7 +92,7 @@ function DashboardPage() {
         <div className="lg:col-span-2">
           <RecentActivityTable activity={activity} isLoading={isLoading} />
         </div>
-        <ChartsPlaceholder />
+        <DashboardCharts charts={charts} isLoading={isLoading} />
       </div>
     </div>
   )

@@ -19,4 +19,15 @@ export async function getRecentActivity(limit = 8) {
   return response.data.items
 }
 
-export default { getDashboardStats, getRecentActivity }
+/**
+ * Fetches the three Chart.js dashboard datasets (score trend, risk-level
+ * distribution, detection breakdown) from the real backend
+ * (GET /api/dashboard/charts).
+ * @param {number} days
+ */
+export async function getDashboardCharts(days = 14) {
+  const response = await apiClient.get('/dashboard/charts', { params: { days } })
+  return response.data
+}
+
+export default { getDashboardStats, getRecentActivity, getDashboardCharts }

@@ -1,11 +1,26 @@
 import { useState } from 'react'
-import { FiInbox, FiLoader, FiTrash2, FiX } from 'react-icons/fi'
+import { FiDownload, FiInbox, FiLoader, FiTrash2, FiX } from 'react-icons/fi'
 import RiskBadge from '../RiskBadge.jsx'
 import { formatRelativeTime, formatScore, truncateText } from '../../utils/formatters.js'
+import { downloadReport } from '../../services/reportService.js'
 
 function HistoryTable({ items, isLoading, onDelete }) {
   const [pendingDeleteId, setPendingDeleteId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
+  const [downloadingId, setDownloadingId] = useState(null)
+  const [downloadError, setDownloadError] = useState(null)
+
+  const handleDownloadReport = async (id) => {
+    setDownloadingId(id)
+    setDownloadError(null)
+    try {
+      await downloadReport(id)
+    } catch (err) {
+      setDownloadError(err.message || 'Failed to download report.')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   const handleConfirmDelete = async (id) => {
     setDeletingId(id)
@@ -43,6 +58,11 @@ function HistoryTable({ items, isLoading, onDelete }) {
 
   return (
     <div className="overflow-x-auto">
+      {downloadError && (
+        <div className="mb-3 rounded-lg border border-risk-critical/30 bg-risk-critical/10 px-3 py-2 text-sm text-risk-critical">
+          {downloadError}
+        </div>
+      )}
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
@@ -95,14 +115,30 @@ function HistoryTable({ items, isLoading, onDelete }) {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPendingDeleteId(item.id)}
-                    className="text-slate-400 hover:text-risk-critical"
-                    aria-label="Delete analysis"
-                  >
-                    <FiTrash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadReport(item.id)}
+                      disabled={downloadingId === item.id}
+                      className="text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
+                      aria-label="Download PDF report"
+                      title="Download PDF report"
+                    >
+                      {downloadingId === item.id ? (
+                        <FiLoader className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FiDownload className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteId(item.id)}
+                      className="text-slate-400 hover:text-risk-critical"
+                      aria-label="Delete analysis"
+                    >
+                      <FiTrash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 )}
               </td>
             </tr>
