@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans antialiased text-slate-800 dark:text-slate-100;
+  }
+}
+
+@layer components {
+  /* Reusable card surface used across dashboard, analyzer, and history pages */
+  .card {
+    @apply bg-white dark:bg-surface-darkCard rounded-xl shadow-card border border-slate-100 dark:border-slate-700 p-6;
+  }
+
+  /* Primary call-to-action button style */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Secondary / outline button style */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 dark:border-slate-600 px-5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700;
+  }
+}

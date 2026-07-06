@@ -1,0 +1,71 @@
+# SafePrompt AI — production-style Docker Compose setup.
+#
+# Two services:
+#   - backend:  FastAPI + the injection/toxicity detectors, talking
+#               exclusively to Supabase (no database container here at
+#               all). Run backend/supabase/schema.sql once against your
+#               Supabase project's SQL Editor before starting this —
+#               it is never run automatically (see
+#               backend/supabase/README.md).
+#   - frontend: the built React SPA served by Nginx, which also
+#               reverse-proxies /api/* to `backend` (see
+#               frontend/nginx.conf) so the browser only talks to one
+#               origin.
+#
+# This is meant for staging/production-like runs, not day-to-day
+# development. For local development, run the backend with
+# `uvicorn app.main:app --reload` and the frontend with `npm run dev`
+# instead (see README.md) so you get hot reload — rebuilding a Docker
+# image on every code change is slow, especially for the backend's
+# torch/transformers dependencies.
+#
+# Usage:
+#   1. cp backend/.env.example backend/.env            (fill in real values)
+#   2. cp frontend/.env.example frontend/.env          (fill in real values)
+#   3. cp .env.example .env                            (fill in real values)
+#   4. docker compose up --build
+#
+# For an actual production deploy, start from
+# backend/.env.production.example and frontend/.env.production.example
+# instead, and see DEPLOYMENT.md for the full walkthrough (CORS origins,
+# TLS, CI/CD via .github/workflows/ci.yml, etc.).
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      # Generated PDF reports (app/services/report_service.py) persist
+      # across container recreates/redeploys instead of vanishing with
+      # the container's writable layer.
+      - reports_data:/app/reports
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  reports_data:

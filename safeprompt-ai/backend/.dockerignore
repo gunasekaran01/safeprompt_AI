@@ -1,0 +1,21 @@
+# Keeps the Docker build context small and avoids leaking local secrets
+# or dev-only artifacts into the image.
+
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+
+tests
+
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+reports/
+safeprompt.db
+
+.git
+.gitignore
