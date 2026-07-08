@@ -167,12 +167,26 @@ def test_delete_nonexistent_history_item_returns_404():
 
 
 def test_dashboard_stats_scoped_to_user():
+    """
+    Exercises the real-Supabase branch of history_service.get_dashboard_stats
+    (reading the pre-aggregated analyses_stats view), not the local-store
+    branch -- conftest.py force-sets USE_LOCAL_DATA_STORE=True for every
+    test (so /api/analyze etc. run fully offline), which would otherwise
+    make get_dashboard_stats take its local-computation branch instead and
+    treat SAMPLE_STATS as a single raw analysis row rather than the
+    pre-aggregated view row it actually represents. Monkeypatching the
+    setting just for this test lets it verify the branch it's actually
+    named for.
+    """
+    from app.core.config import get_settings
+
     builder = _RecordingQueryBuilder([SAMPLE_STATS])
     _override_auth()
     try:
-        with patch(
-            "app.services.history_service.get_supabase_client",
-            return_value=SimpleNamespace(table=lambda _name: builder),
+        with (
+            patch("app.services.history_service.get_supabase_client",
+                  return_value=SimpleNamespace(table=lambda _name: builder)),
+            patch.object(get_settings(), "USE_LOCAL_DATA_STORE", False),
         ):
             response = client.get("/api/dashboard/stats")
     finally:

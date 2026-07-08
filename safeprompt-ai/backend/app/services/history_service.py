@@ -20,6 +20,7 @@ from app.schemas.analysis import PromptAnalysisResponse
 logger = logging.getLogger(__name__)
 
 ANALYSES_TABLE = "analyses"
+REPORTS_TABLE = "reports"
 STATS_VIEW = "analyses_stats"
 
 
@@ -57,13 +58,16 @@ def list_analysis_records(
     user_id: str,
     search: Optional[str] = None,
     risk_level: Optional[str] = None,
+    injection_only: bool = False,
+    toxicity_only: bool = False,
     limit: int = 20,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
     """
     Returns (records, total_count) for user_id's history, most recent
-    first, with optional case-insensitive prompt search and risk-level
-    filter. ALWAYS filtered by user_id — never returns another user's rows.
+    first, with optional case-insensitive prompt search, risk-level
+    filter, and injection/toxicity-only filters. ALWAYS filtered by
+    user_id — never returns another user's rows.
     """
     client = get_supabase_client()
     query = client.table(ANALYSES_TABLE).select("*", count="exact").eq("user_id", user_id)
@@ -72,6 +76,10 @@ def list_analysis_records(
         query = query.ilike("prompt", f"%{search}%")
     if risk_level:
         query = query.eq("risk_level", risk_level)
+    if injection_only:
+        query = query.eq("injection_detected", True)
+    if toxicity_only:
+        query = query.eq("toxicity_detected", True)
 
     query = query.order("created_at", desc=True).range(offset, offset + limit - 1)
     response = query.execute()
@@ -168,3 +176,35 @@ def get_recent_activity(user_id: str, limit: int = 8) -> list[dict]:
         .execute()
     )
     return response.data or []
+
+
+def create_report_record(user_id: str, analysis_id: str, file_path: str) -> Optional[dict]:
+    """
+    Records a generated PDF report in the `reports` table, owned by
+    `user_id`. Called by app/api/reports.py right after
+    report_pdf_service renders the PDF to disk, so every generation is
+    auditable and shows up in admin's report count. Failures are logged
+    but not raised -- a database hiccup here shouldn't prevent the user
+    from downloading a PDF that already rendered successfully.
+
+    Payload matches the `reports` table columns in
+    backend/supabase/schema.sql exactly (id/generated_at are filled in
+    by the column defaults there, or by LocalDataStore's equivalent
+    fallback when USE_LOCAL_DATA_STORE=True) -- unlike the older,
+    unwired app/db/crud.py:create_report, which also sends a `format`
+    key that has no matching column and would be rejected by PostgREST.
+    """
+    payload = {
+        "user_id": user_id,
+        "analysis_id": analysis_id,
+        "file_path": file_path,
+    }
+    try:
+        client = get_supabase_client()
+        response = client.table(REPORTS_TABLE).insert(payload).execute()
+        return response.data[0] if response.data else None
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Failed to persist report record for analysis %s (user %s).", analysis_id, user_id
+        )
+        return None

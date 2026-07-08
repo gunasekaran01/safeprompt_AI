@@ -14,17 +14,21 @@ history.py), renders a fresh PDF via report_pdf_service, and streams it
 back as a file download.
 
 Every generation is also recorded in the `reports` Supabase table via
-app.db.crud.create_report -- those two functions (create_report,
-list_reports_for_analysis) are plain table helpers with no dependency on
-the deprecated AnalyzeResponse-based analyses code that lives alongside
-them in crud.py, so they're reused here rather than duplicated.
+app.services.history_service.create_report_record -- not
+app.db.crud.create_report, an older helper that sends a `format` key
+the real `reports` table schema (backend/supabase/schema.sql) has no
+column for, and that a real PostgREST/Supabase insert would reject.
+Against the local in-memory dev store (app/db/local_store.py, which
+doesn't validate columns) that extra key was silently accepted, so this
+never surfaced as a request failure locally -- it just meant every
+report "successfully" recorded a shape that would break the moment this
+ran against a real Supabase project.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from app.core.security import get_current_user
-from app.db import crud
 from app.schemas.auth import CurrentUser
 from app.services import history_service, report_pdf_service
 
@@ -54,7 +58,7 @@ def get_report(
     file_path = report_pdf_service.generate_report_pdf(record)
 
     try:
-        crud.create_report(analysis_id, str(file_path), current_user.id)
+        history_service.create_report_record(current_user.id, analysis_id, str(file_path))
     except Exception:  # noqa: BLE001
         # Metadata bookkeeping failing shouldn't block the user from
         # getting their PDF -- the file was already generated above.

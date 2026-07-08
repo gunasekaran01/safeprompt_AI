@@ -33,6 +33,16 @@ def test_get_report_generates_and_downloads_a_pdf(tmp_path, monkeypatch):
 
 
 def test_get_report_records_metadata_in_supabase(tmp_path, monkeypatch):
+    """
+    Verifies persistence through app/services/history_service.py's
+    create_report_record (the live path -- see app/api/reports.py), not
+    the old app/db/crud.py:create_report/list_reports_for_analysis, which
+    is unwired from any route and writes/reads through a completely
+    separate fake client than the one the live route actually uses.
+    Checking via crud here previously always found zero records
+    regardless of whether the real route worked, and asserted on a
+    'format' field the current `reports` table schema doesn't have.
+    """
     monkeypatch.setattr(get_settings(), "REPORTS_DIR", str(tmp_path))
 
     created = client.post("/api/analyze", json={"prompt": "Another prompt for reporting."})
@@ -40,12 +50,16 @@ def test_get_report_records_metadata_in_supabase(tmp_path, monkeypatch):
 
     client.get(f"/api/reports/{analysis_id}")
 
-    from app.db import crud
+    from app.db.supabase_client import get_supabase_client
 
-    records = crud.list_reports_for_analysis(analysis_id, user_id=TEST_USER_ID)
+    response = (
+        get_supabase_client().table("reports").select("*").eq("analysis_id", analysis_id).execute()
+    )
+    records = response.data
     assert len(records) == 1
     assert records[0]["analysis_id"] == analysis_id
-    assert records[0]["format"] == "pdf"
+    assert records[0]["user_id"] == TEST_USER_ID
+    assert records[0]["file_path"]
 
 
 def test_get_report_returns_404_for_unknown_analysis():

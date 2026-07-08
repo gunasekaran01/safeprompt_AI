@@ -134,6 +134,7 @@ function Navbar() {
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.requiresAdmin && !isAdmin) return false
     if (item.requiresAuth && !isAuthenticated) return false
+    if (item.hideWhenAuth && isAuthenticated) return false
     return true
   })
 
@@ -154,7 +155,7 @@ function Navbar() {
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-surface-dark/90">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo / brand */}
-        <NavLink to="/" className="flex items-center gap-2" onClick={closeMobileMenu}>
+        <NavLink to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-2" onClick={closeMobileMenu}>
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
             <FiShield className="h-5 w-5" />
           </span>

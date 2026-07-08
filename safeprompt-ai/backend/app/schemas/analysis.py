@@ -62,6 +62,10 @@ class ToxicityResult(CamelCaseModel):
 class PromptAnalysisResponse(CamelCaseModel):
     """Full response body for POST /api/analyze."""
 
+    id: Optional[str] = Field(
+        default=None,
+        description="The persisted analysis record's id, if it was saved successfully.",
+    )
     prompt: str
     injection: InjectionResult
     toxicity: ToxicityResult

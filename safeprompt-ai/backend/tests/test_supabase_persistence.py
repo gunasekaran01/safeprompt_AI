@@ -165,6 +165,17 @@ def test_list_all_analyses_returns_everything_up_to_limit():
 
 
 def test_analyze_endpoint_persists_a_record():
+    """
+    Verifies persistence through the live path: app/api/analysis.py ->
+    app/services/history_service.py -> the shared LocalDataStore/Supabase
+    client. Previously checked via app.db.crud, which is unwired from this
+    route entirely and reads/writes through its own separate fake client
+    (see tests/conftest.py's fake_supabase fixture) -- so it could never
+    see rows the live route actually persisted. Also previously asserted
+    on body["score"]/body["risk_level"], which don't exist on the current
+    camelCase response (it's safetyScore/riskLevel) -- a second latent bug
+    masked by the id KeyError this test used to hit first.
+    """
     response = client.post(
         "/api/analyze",
         json={"prompt": "Can you help me plan a birthday party?"},
@@ -172,11 +183,13 @@ def test_analyze_endpoint_persists_a_record():
     assert response.status_code == 200
     body = response.json()
 
-    record = crud.get_analysis(body["id"], user_id=TEST_USER_ID)
-    assert record is not None
-    assert record.prompt == "Can you help me plan a birthday party?"
-    assert record.score == body["score"]
-    assert record.risk_level == body["risk_level"]
+    from app.db.supabase_client import get_supabase_client
+
+    row = get_supabase_client().table("analyses").select("*").eq("id", body["id"]).execute().data[0]
+    assert row is not None
+    assert row["prompt"] == "Can you help me plan a birthday party?"
+    assert row["safety_score"] == body["safetyScore"]
+    assert row["risk_level"] == body["riskLevel"]
 
 
 def test_analyze_endpoint_persists_injection_detection_fields():
@@ -186,17 +199,28 @@ def test_analyze_endpoint_persists_injection_detection_fields():
     )
     body = response.json()
 
-    record = crud.get_analysis(body["id"], user_id=TEST_USER_ID)
-    assert record.injection_detected is True
-    assert record.injection_confidence == body["injection_confidence"]
-    assert record.reasoning == body["reasoning"]
+    from app.db.supabase_client import get_supabase_client
+
+    row = get_supabase_client().table("analyses").select("*").eq("id", body["id"]).execute().data[0]
+    assert row["injection_detected"] is True
+    assert row["injection_confidence"] == body["injection"]["confidence"]
+    assert row["reasoning"] == body["reasoning"]
 
 
 def test_multiple_analyze_calls_each_persist_their_own_record():
     client.post("/api/analyze", json={"prompt": "First prompt."})
     client.post("/api/analyze", json={"prompt": "Second prompt."})
 
-    assert crud.count_analyses(user_id=TEST_USER_ID) == 2
+    from app.db.supabase_client import get_supabase_client
+
+    result = (
+        get_supabase_client()
+        .table("analyses")
+        .select("*", count="exact")
+        .eq("user_id", TEST_USER_ID)
+        .execute()
+    )
+    assert result.count == 2
 
 
 # --- app/api/routes/history.py, via the HTTP layer (Milestone 11) --------
@@ -246,7 +270,10 @@ def test_delete_history_item_removes_the_record():
     delete_response = client.delete(f"/api/history/{analysis_id}")
     assert delete_response.status_code == 204
 
-    assert crud.get_analysis(analysis_id, user_id=TEST_USER_ID) is None
+    from app.db.supabase_client import get_supabase_client
+
+    remaining = get_supabase_client().table("analyses").select("*").eq("id", analysis_id).execute().data
+    assert remaining == []
 
     second_delete = client.delete(f"/api/history/{analysis_id}")
     assert second_delete.status_code == 404

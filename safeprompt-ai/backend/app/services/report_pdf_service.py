@@ -35,9 +35,10 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from app.core.config import get_settings
+
 # app/services/report_pdf_service.py -> services -> app -> backend -> safeprompt-ai (project root)
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_REPORTS_DIR = _PROJECT_ROOT / "reports"
 
 RISK_LEVEL_COLORS = {
     "safe": colors.HexColor("#16a34a"),
@@ -49,8 +50,23 @@ RISK_LEVEL_COLORS = {
 
 
 def _reports_dir() -> Path:
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    return _REPORTS_DIR
+    """
+    Resolves Settings.REPORTS_DIR (default "reports") to an absolute path,
+    relative to the project root when given as a relative path -- e.g.
+    the default "reports" resolves to <project_root>/reports, matching
+    the top-level reports/ folder in README.md's project structure.
+    Reads get_settings() on every call (rather than caching the resolved
+    path at import time) specifically so tests can monkeypatch
+    Settings.REPORTS_DIR to a tmp_path per-test and have it actually take
+    effect -- this previously used a hardcoded module-level _REPORTS_DIR
+    that ignored the setting entirely, so every test run was silently
+    writing PDFs into the real project reports/ folder regardless of
+    what tests monkeypatched.
+    """
+    configured = Path(get_settings().REPORTS_DIR)
+    directory = configured if configured.is_absolute() else _PROJECT_ROOT / configured
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
 
 
 def _report_filename(analysis_id: str) -> str:

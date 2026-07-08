@@ -92,6 +92,13 @@ def analyze_prompt(
 
     # Persistence failures are logged internally and never raised — a
     # database hiccup shouldn't prevent the user from seeing their result.
-    history_service.create_analysis_record(current_user.id, result)
+    # Captures the persisted row's id and attaches it to the response --
+    # previously this call's return value was discarded, so `result.id`
+    # stayed None forever and every consumer that needs the id right after
+    # creating an analysis (generating its report, deleting it, linking to
+    # it) had no way to get one without a separate history fetch.
+    created_record = history_service.create_analysis_record(current_user.id, result)
+    if created_record is not None:
+        result.id = created_record.get("id")
 
     return result

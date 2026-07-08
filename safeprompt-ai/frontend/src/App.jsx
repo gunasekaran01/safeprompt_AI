@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout/Layout.jsx'
 import ProtectedRoute from './components/Auth/ProtectedRoute.jsx'
+import PublicOnlyRoute from './components/Auth/PublicOnlyRoute.jsx'
 import AdminRoute from './components/Auth/AdminRoute.jsx'
 import HomePage from './pages/HomePage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
@@ -17,18 +18,27 @@ import NotFoundPage from './pages/NotFoundPage.jsx'
 
 /**
  * Top-level route table. All routes render inside the shared <Layout />
- * (navbar + footer). Dashboard, Analyzer, History, and Settings require
- * an authenticated session via <ProtectedRoute />; /admin additionally
- * requires isAdmin via <AdminRoute />; Home, About, and the auth pages
- * are public. Unmatched paths fall through to the 404 page.
+ * (navbar + footer). Home and About are the pre-login landing pages --
+ * wrapped in <PublicOnlyRoute />, they redirect an already-signed-in
+ * user straight to /dashboard, so they're never shown "after login"
+ * (and utils/navigation.js hides their nav links once authenticated,
+ * for the same reason). Dashboard, Analyzer, History, and Settings
+ * require an authenticated session via <ProtectedRoute />; /admin
+ * additionally requires isAdmin via <AdminRoute />. The auth pages
+ * (login/register/forgot/reset) stay public/unrestricted. Unmatched
+ * paths fall through to the 404 page.
  */
 function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
+        {/* Public landing pages -- redirect to /dashboard if already signed in */}
+        <Route element={<PublicOnlyRoute />}>
+          <Route index element={<HomePage />} />
+          <Route path="about" element={<AboutPage />} />
+        </Route>
+
         {/* Public routes */}
-        <Route index element={<HomePage />} />
-        <Route path="about" element={<AboutPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />

@@ -27,6 +27,8 @@ VALID_RISK_LEVELS = {"safe", "low", "medium", "high", "critical"}
 def get_history(
     search: Optional[str] = Query(default=None, max_length=500),
     risk_level: Optional[str] = Query(default=None),
+    injection_only: bool = Query(default=False),
+    toxicity_only: bool = Query(default=False),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current_user: CurrentUser = Depends(get_current_user),
@@ -42,6 +44,8 @@ def get_history(
             user_id=current_user.id,
             search=search,
             risk_level=risk_level,
+            injection_only=injection_only,
+            toxicity_only=toxicity_only,
             limit=limit,
             offset=offset,
         )
