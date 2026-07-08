@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FiCheck, FiInfo, FiMonitor, FiMoon, FiRefreshCw, FiSettings, FiSun, FiUser } from 'react-icons/fi'
 import { useTheme } from '../utils/ThemeContext.jsx'
 import { useLocalStorage } from '../utils/useLocalStorage.js'
+import { useAuth } from '../utils/AuthContext.jsx'
+import { getSettings, updateSettings } from '../services/settingsService.js'
 import { APP_NAME, APP_VERSION } from '../utils/constants.js'
 import ProfileForm from '../components/Settings/ProfileForm.jsx'
 
@@ -38,6 +40,7 @@ function ToggleRow({ title, description, checked, onChange }) {
 }
 
 function SettingsPage() {
+  const { isAuthenticated } = useAuth()
   const { theme, setTheme } = useTheme()
   const [compactMode, setCompactMode] = useLocalStorage('safeprompt-ai-compact-mode', false)
   const [autoAnalyzeOnPaste, setAutoAnalyzeOnPaste] = useLocalStorage(
@@ -45,11 +48,68 @@ function SettingsPage() {
     false,
   )
   const [showResetConfirmation, setShowResetConfirmation] = useState(false)
+  const [syncError, setSyncError] = useState(null)
+  // Guards against re-PATCHing the server the moment we've just
+  // hydrated local state *from* the server (see the effect below).
+  const isHydratingRef = useRef(false)
+
+  // On login (or on mount if already logged in), pull this user's
+  // settings from Supabase and let them win over whatever's cached in
+  // localStorage -- that's what makes preferences follow the user across
+  // devices/browsers instead of being purely per-browser.
+  useEffect(() => {
+    if (!isAuthenticated) return undefined
+    let isCancelled = false
+
+    getSettings()
+      .then((remote) => {
+        if (isCancelled) return
+        isHydratingRef.current = true
+        setTheme(remote.theme)
+        setCompactMode(remote.compactMode)
+        setAutoAnalyzeOnPaste(remote.autoAnalyzeOnPaste)
+        setSyncError(null)
+      })
+      .catch(() => {
+        if (!isCancelled) setSyncError('Could not load your saved settings from the server. Using local preferences instead.')
+      })
+      .finally(() => {
+        isHydratingRef.current = false
+      })
+
+    return () => {
+      isCancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
+
+  const pushSettings = (updates) => {
+    if (!isAuthenticated || isHydratingRef.current) return
+    updateSettings(updates)
+      .then(() => setSyncError(null))
+      .catch(() => setSyncError('Changes are saved on this device but could not be synced to your account.'))
+  }
+
+  const handleSetTheme = (value) => {
+    setTheme(value)
+    pushSettings({ theme: value })
+  }
+
+  const handleSetCompactMode = (value) => {
+    setCompactMode(value)
+    pushSettings({ compactMode: value })
+  }
+
+  const handleSetAutoAnalyzeOnPaste = (value) => {
+    setAutoAnalyzeOnPaste(value)
+    pushSettings({ autoAnalyzeOnPaste: value })
+  }
 
   const handleResetPreferences = () => {
     setTheme('system')
     setCompactMode(false)
     setAutoAnalyzeOnPaste(false)
+    pushSettings({ theme: 'system', compactMode: false, autoAnalyzeOnPaste: false })
     setShowResetConfirmation(true)
     window.setTimeout(() => setShowResetConfirmation(false), 2500)
   }
@@ -62,8 +122,13 @@ function SettingsPage() {
         </div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Preferences are saved locally in your browser.
+          {isAuthenticated
+            ? 'Preferences are saved to your account and sync across devices.'
+            : 'Preferences are saved locally in your browser. Sign in to sync them across devices.'}
         </p>
+        {syncError && (
+          <p className="text-xs font-medium text-risk-medium">{syncError}</p>
+        )}
       </div>
 
       {/* Profile */}
@@ -89,7 +154,7 @@ function SettingsPage() {
               <button
                 key={value}
                 type="button"
-                onClick={() => setTheme(value)}
+                onClick={() => handleSetTheme(value)}
                 className={`flex flex-col items-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors ${
                   isSelected
                     ? 'border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300'
@@ -114,13 +179,13 @@ function SettingsPage() {
           title="Compact Mode"
           description="Reduce spacing in the dashboard and history tables for denser layouts."
           checked={compactMode}
-          onChange={setCompactMode}
+          onChange={handleSetCompactMode}
         />
         <ToggleRow
           title="Auto-Analyze on Paste"
           description="Automatically run the analyzer when a prompt is pasted into the input field."
           checked={autoAnalyzeOnPaste}
-          onChange={setAutoAnalyzeOnPaste}
+          onChange={handleSetAutoAnalyzeOnPaste}
         />
       </section>
 

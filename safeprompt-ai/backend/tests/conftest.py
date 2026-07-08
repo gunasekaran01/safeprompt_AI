@@ -30,6 +30,18 @@ os.environ.setdefault("ENABLE_ML_DETECTORS", "False")
 # make a network call.
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_ANON_KEY", "test-anon-key")
+# Force-set (not setdefault) regardless of whatever backend/.env has on
+# disk for real deployments (USE_LOCAL_DATA_STORE=False there, so
+# production actually persists to Postgres). app/services/history_service.py,
+# profile_service.py, dashboard_charts_service.py, and report_pdf_service.py
+# all import get_supabase_client from app.db.supabase_client directly (not
+# app.db.crud, which is the only thing the fake_supabase fixture below
+# patches) -- without this, those services pick up the real, disk-based
+# USE_LOCAL_DATA_STORE=False setting and every test that hits /api/analyze,
+# /api/history, /api/dashboard/*, or /api/reports/* tries a real network
+# call to Supabase and fails with a DNS/connection error instead of
+# running against the in-memory LocalDataStore.
+os.environ["USE_LOCAL_DATA_STORE"] = "True"
 
 from types import SimpleNamespace
 
@@ -55,6 +67,31 @@ def fake_supabase(monkeypatch):
     fake_client = FakeSupabaseClient()
     monkeypatch.setattr("app.db.crud.get_supabase_client", lambda: fake_client)
     return fake_client
+
+
+@pytest.fixture(autouse=True)
+def reset_local_data_store():
+    """
+    Clears app/db/supabase_client.py's process-wide, @lru_cache'd
+    LocalDataStore before and after every test.
+
+    This is the store app/services/history_service.py, profile_service.py,
+    dashboard_charts_service.py, and report_pdf_service.py actually read
+    from and write to (everything that imports get_supabase_client from
+    app.db.supabase_client, as opposed to app.db.crud, which the
+    fake_supabase fixture above handles separately). It's cached for the
+    life of the *process* by design, which means without this fixture it's
+    also shared across every test in the session -- rows written by one
+    test stay visible to every test that runs after it. Clearing it here
+    gives every test a fresh, empty store.
+    """
+    from app.db import supabase_client
+
+    supabase_client.get_supabase_client.cache_clear()
+    supabase_client._get_local_data_store.cache_clear()
+    yield
+    supabase_client.get_supabase_client.cache_clear()
+    supabase_client._get_local_data_store.cache_clear()
 
 
 class _FakeAuth:

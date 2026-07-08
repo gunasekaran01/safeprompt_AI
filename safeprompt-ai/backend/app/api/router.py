@@ -13,6 +13,7 @@ Mounted routers:
 - profiles  -> GET/PATCH /api/profiles/me                  (app/api/routes/profiles.py)
 - profile_compat -> GET/PATCH /api/profile (singular)      (app/api/routes/profile_compat.py)
 - admin     -> GET /api/admin/overview, /api/admin/users...  (app/api/routes/admin.py)
+- settings  -> GET/PATCH /api/settings                      (app/api/settings.py)
 
 Note: app/api/analysis.py, history.py, and reports.py (top-level, under
 app/api/ directly) are the current, correct implementations — they use
@@ -31,6 +32,7 @@ from app.api.analysis import router as analysis_router
 from app.api.history import router as history_router
 from app.api.reports import router as reports_router
 from app.api.routes import admin, auth, profile_compat, profiles
+from app.api.settings import router as settings_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router)
@@ -40,3 +42,4 @@ api_router.include_router(auth.router)
 api_router.include_router(profiles.router)
 api_router.include_router(profile_compat.router)
 api_router.include_router(admin.router)
+api_router.include_router(settings_router)

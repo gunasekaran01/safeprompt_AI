@@ -12,12 +12,19 @@ authenticated user — a record that exists but belongs to someone else is
 indistinguishable from one that doesn't exist, same convention as
 history.py), renders a fresh PDF via report_pdf_service, and streams it
 back as a file download.
+
+Every generation is also recorded in the `reports` Supabase table via
+app.db.crud.create_report -- those two functions (create_report,
+list_reports_for_analysis) are plain table helpers with no dependency on
+the deprecated AnalyzeResponse-based analyses code that lives alongside
+them in crud.py, so they're reused here rather than duplicated.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from app.core.security import get_current_user
+from app.db import crud
 from app.schemas.auth import CurrentUser
 from app.services import history_service, report_pdf_service
 
@@ -45,6 +52,13 @@ def get_report(
         raise HTTPException(status_code=404, detail="Analysis not found.")
 
     file_path = report_pdf_service.generate_report_pdf(record)
+
+    try:
+        crud.create_report(analysis_id, str(file_path), current_user.id)
+    except Exception:  # noqa: BLE001
+        # Metadata bookkeeping failing shouldn't block the user from
+        # getting their PDF -- the file was already generated above.
+        pass
 
     return FileResponse(
         path=str(file_path),
